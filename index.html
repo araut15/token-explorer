@@ -1,0 +1,362 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="claude:viewport-fit-sides" content="cover">
+<title>Token Explorer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Serif:wght@500;600&display=swap">
+<style>
+/* Same ledger-desk look as Follow the Money: scenario chooser, step rail, one headline answer, four party cards. */
+:root {
+  --bg: #f2f5f3; --surface: #ffffff; --ink: #16211c; --muted: #56645d; --rule: #d5ddd8;
+  --accent: #1d5e48; --accent-soft: #e2efe9;
+  --bad: #a3402c; --bad-soft: #f7e6e1; --good: #1d6b3f; --good-soft: #e1f1e6; --warn: #8a6100; --warn-soft: #f6edd6;
+  --font-display: "IBM Plex Serif", Georgia, "Times New Roman", serif;
+  --font-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-num: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f1613; --surface: #17211d; --ink: #e6eeea; --muted: #9aaba3; --rule: #2b3833;
+    --accent: #6cc3a0; --accent-soft: #1d3329; --bad: #ef8f78; --bad-soft: #3a211b;
+    --good: #79cf98; --good-soft: #1b3324; --warn: #e2b555; --warn-soft: #3a2f16; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f1613; --surface: #17211d; --ink: #e6eeea; --muted: #9aaba3; --rule: #2b3833;
+  --accent: #6cc3a0; --accent-soft: #1d3329; --bad: #ef8f78; --bad-soft: #3a211b;
+  --good: #79cf98; --good-soft: #1b3324; --warn: #e2b555; --warn-soft: #3a2f16; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 15px; line-height: 1.55;
+  padding: 28px max(16px, env(safe-area-inset-right, 0px)) 40px max(16px, env(safe-area-inset-left, 0px));
+}
+.wrap { max-width: 1040px; margin: 0 auto; display: flex; flex-direction: column; gap: 22px; }
+header { display: flex; flex-direction: column; gap: 6px; }
+.eyebrow { font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); font-weight: 600; }
+h1 { font-family: var(--font-display); font-weight: 600; font-size: clamp(28px, 4.4vw, 40px); line-height: 1.15; margin: 0; text-wrap: balance; }
+.lede { color: var(--muted); max-width: 66ch; margin: 0; }
+
+.chooser { display: flex; flex-wrap: wrap; gap: 8px; }
+.chooser button {
+  font: inherit; font-size: 14px; font-weight: 500; color: var(--ink); background: var(--surface);
+  border: 1px solid var(--rule); border-radius: 999px; padding: 8px 16px; cursor: pointer;
+}
+.chooser button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--bg); }
+button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.intro { color: var(--muted); margin: 0; max-width: 72ch; }
+
+.rail-wrap { overflow-x: auto; }
+.rail { display: grid; grid-template-columns: repeat(var(--n, 5), minmax(0, 1fr)); position: relative; min-width: 0; }
+.rail::before { content: ""; position: absolute; left: 0; right: 0; top: 13px; height: 2px; background: var(--rule); }
+.rail button { position: relative; background: none; border: 0; padding: 0 6px 0 0; text-align: left; cursor: pointer; font: inherit; color: var(--muted); display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.rail .dot { width: 28px; height: 28px; border-radius: 50%; border: 2px solid var(--rule); background: var(--bg); display: grid; place-items: center; font-family: var(--font-num); font-size: 12px; color: var(--muted); }
+.rail button.done .dot { border-color: var(--accent); color: var(--accent); }
+.rail button.current .dot { background: var(--accent); border-color: var(--accent); color: var(--bg); }
+.rail .rt { font-size: 13px; font-weight: 600; color: var(--ink); line-height: 1.25; }
+.rail button:not(.current):not(.done) .rt { color: var(--muted); font-weight: 500; }
+
+.where { background: var(--surface); border: 1px solid var(--rule); border-radius: 12px; padding: 20px 22px; display: flex; flex-direction: column; gap: 10px; }
+.where .label { font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+.where .answer { font-family: var(--font-display); font-size: clamp(20px, 2.6vw, 26px); line-height: 1.3; margin: 0; text-wrap: balance; }
+.where .detail { color: var(--muted); margin: 0; max-width: 76ch; }
+.where .status { align-self: flex-start; font-weight: 600; font-size: 13px; padding: 4px 12px; border-radius: 999px; }
+.status.ok { background: var(--good-soft); color: var(--good); }
+.status.bad { background: var(--bad-soft); color: var(--bad); }
+.status.info { background: var(--accent-soft); color: var(--accent); }
+
+.flow { font-family: var(--font-num); font-size: 13px; color: var(--accent); min-height: 20px; }
+
+.parties { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.party { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 10px; min-width: 0; transition: border-color .25s ease; }
+.party.active { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.party.blocked { border-color: var(--bad); box-shadow: inset 0 0 0 1px var(--bad); }
+.party .who { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+.party .name { font-weight: 600; margin-top: -6px; }
+.party .sees { font-size: 12px; color: var(--muted); border-top: 1px solid var(--rule); padding-top: 8px; }
+.rows { display: flex; flex-direction: column; gap: 8px; }
+.row { display: flex; flex-direction: column; gap: 2px; }
+.row .k { font-size: 12px; color: var(--muted); }
+.row .v { font-family: var(--font-num); font-size: 14px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.row .tag { align-self: flex-start; font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 5px; margin-top: 2px; }
+.tag.pan { background: var(--warn-soft); color: var(--warn); }
+.tag.token { background: var(--accent-soft); color: var(--accent); }
+.tag.off { background: var(--bad-soft); color: var(--bad); }
+.tag.okk { background: var(--good-soft); color: var(--good); }
+.empty { color: var(--muted); font-size: 13px; font-style: italic; }
+
+.tally { display: flex; flex-wrap: wrap; gap: 6px 18px; align-items: center; border: 1px dashed var(--rule); border-radius: 10px; padding: 12px 16px; font-size: 14px; }
+.tally b { font-weight: 600; }
+.tally .pan { color: var(--warn); font-weight: 600; }
+
+.controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.controls button { font: inherit; font-weight: 600; font-size: 14px; border-radius: 8px; padding: 10px 18px; cursor: pointer; border: 1px solid var(--rule); background: var(--surface); color: var(--ink); }
+.controls button.primary { background: var(--accent); border-color: var(--accent); color: var(--bg); }
+.controls button:disabled { opacity: .45; cursor: default; }
+.controls .hint { color: var(--muted); font-size: 13px; }
+
+footer { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; color: var(--muted); font-size: 13px; border-top: 1px solid var(--rule); padding-top: 14px; }
+
+@media (max-width: 820px) { .parties { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 640px) {
+  .rail { grid-template-columns: repeat(var(--n, 5), 96px); padding-bottom: 6px; }
+  .party { padding: 12px; }
+  .row .v { font-size: 13px; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Payments, Decoded · Interactive</div>
+    <h1>Who sees your real card number?</h1>
+    <p class="lede">Add a card to a phone, tap to pay, then try to steal the token. At every step, the four cards below show exactly what each party can see.</p>
+  </header>
+
+  <div class="chooser" role="group" aria-label="Choose a scenario" id="chooser"></div>
+  <p class="intro" id="intro"></p>
+
+  <div class="rail-wrap"><div class="rail" id="rail" role="list"></div></div>
+
+  <section class="where" aria-live="polite">
+    <div class="label">What's happening</div>
+    <p class="answer" id="answer"></p>
+    <p class="detail" id="detail"></p>
+    <span class="status" id="status" hidden></span>
+    <div class="flow" id="flow"></div>
+  </section>
+
+  <div class="parties" id="parties"></div>
+  <div class="tally" id="tally"></div>
+
+  <div class="controls">
+    <button type="button" id="prev">Back</button>
+    <button type="button" id="next" class="primary">Next step</button>
+    <button type="button" id="restart">Start over</button>
+    <span class="hint">Tip: use the ← and → keys.</span>
+  </div>
+
+  <footer>
+    <span>Example numbers only: 4111 1111 1111 1111 is a standard test card. Real systems are more involved.</span>
+    <span>© 2026 Ankit</span>
+  </footer>
+</div>
+
+<script>
+const PAN = "4111 1111 1111 1111";
+const TOKEN = "4895 3701 2847 6620";
+const TOKEN2 = "4895 3701 9310 4458";
+const AMT = "$50.00 · Café";
+const hex = n => Array.from({ length: n }, () => "0123456789ABCDEF"[Math.floor(Math.random() * 16)]).join("");
+let C1 = hex(8), C2 = hex(8);
+
+const parties = [
+  { id: "phone", who: "You", name: "Your phone" },
+  { id: "store", who: "Merchant side", name: "Store and acquirer" },
+  { id: "network", who: "Card network", name: "Token service and vault" },
+  { id: "issuer", who: "Your bank", name: "Issuer" }
+];
+
+// Row helpers: [label, value, tag]
+const pan = (k = "Card number") => [k, PAN, "pan"];
+const tok = (k = "Token") => [k, TOKEN, "token"];
+
+const S = {
+  pay: {
+    label: "Pay with a phone",
+    intro: "Follow one card from the plastic in your hand to a token in your phone, then through a $50 tap at a café.",
+    steps: [
+      { t: "Your card", answer: "Right now, the only number that exists is your real card number.",
+        detail: "It's printed on your plastic card. Anyone who gets these 16 digits, plus the expiry date and security code, can try to use it online.",
+        status: ["info", "Starting point"],
+        v: { phone: [], store: [], network: [], issuer: [pan(), ["Account", "Active", "okk"]] } },
+      { t: "Add to wallet", answer: "You add the card. The wallet sends it straight to the network's token service.",
+        detail: "This is the one moment your real card number travels from your phone, and it goes to the token service, not to any store.",
+        flow: "Phone → token service: card number, encrypted", active: ["phone", "network"],
+        v: { phone: [["Adding card", "•••• 1111"]], store: [], network: [pan("Card received")], issuer: [pan(), ["Account", "Active", "okk"]] } },
+      { t: "Issuer approves", answer: "Your bank checks it's really you and approves the card for this phone.",
+        detail: "If anything looks unusual, it might send you a one-time code or ask you to confirm in its app.",
+        flow: "Token service ⇄ issuer: approve this device?", active: ["network", "issuer"], status: ["ok", "Approved for this device"],
+        v: { phone: [["Adding card", "•••• 1111"]], store: [], network: [pan("Card received")], issuer: [pan(), ["Device request", "Approved", "okk"]] } },
+      { t: "Token created", answer: "A token is created and stored on your phone. Your real number never sits there.",
+        detail: "The network's vault keeps the link between token and card. Your phone only knows the token, tied to this one device.",
+        flow: "Token service → phone: token", active: ["phone", "network"],
+        v: { phone: [tok(), ["Works on", "This phone only"]], store: [], network: [tok(), pan("Linked to")], issuer: [pan(), ["Token on file", "•••• 6620"]] } },
+      { t: "You tap", answer: "You unlock with your face and tap. The phone sends the token and a one-time code.",
+        detail: "The one-time code, called a cryptogram, is new for every purchase. To the café, it looks like any contactless card.",
+        flow: "Phone → store: token + cryptogram + amount", active: ["phone", "store"],
+        v: { phone: [tok(), ["One-time code", () => C1]], store: [tok("Card number received"), ["One-time code", () => C1], ["Amount", AMT]], network: [tok(), pan("Linked to")], issuer: [pan(), ["Token on file", "•••• 6620"]] } },
+      { t: "Network swaps", answer: "The network checks the code and swaps the token for your real card number.",
+        detail: "This is called detokenization. It's the only point in the payment where the token turns back into your card number.",
+        flow: "Store → network → issuer: real card number + amount", active: ["network", "issuer"], status: ["ok", "Cryptogram valid"],
+        v: { phone: [tok()], store: [tok("Card number received"), ["Amount", AMT]], network: [tok(), pan("Swapped to"), ["One-time code", "Checked, now used up"]], issuer: [pan("Request for"), ["Amount", AMT]] } },
+      { t: "Approved", answer: "Your bank approves. The answer goes back with the token, not your card number.",
+        detail: "The café's receipt shows the last four digits of the token, 6620, not of your plastic card, 1111.",
+        flow: "Issuer → network → store: approved", active: ["store", "issuer"], status: ["ok", "Approved"],
+        v: { phone: [tok(), ["Last payment", "$50.00 approved", "okk"]], store: [tok("On the receipt"), ["Result", "Approved", "okk"]], network: [tok(), pan("Linked to")], issuer: [pan(), ["Result", "Approved $50.00", "okk"]] } }
+    ]
+  },
+  steal: {
+    label: "Try to steal it",
+    intro: "A hacker breaks into the café's systems after your payment. Let's see what they can do with what they find.",
+    steps: [
+      { t: "The breach", answer: "The hacker copies everything the café stored about your payment.",
+        detail: "That means the token and the one-time code from your tap. Your real card number was never there to steal.",
+        status: ["bad", "Café breached"], active: ["store"],
+        v: { phone: [tok()], store: [tok("Stolen token"), ["Stolen code", () => C1]], network: [tok(), pan("Linked to")], issuer: [pan(), ["Account", "Active", "okk"]] } },
+      { t: "Replay in store", answer: "They try to reuse the token and code at another shop.",
+        detail: "The network sees that this one-time code was already used, so it declines without even asking your bank.",
+        flow: "Fraudster → network: token + old code", active: ["network"], blocked: ["store"], status: ["bad", "Declined: code already used"],
+        v: { phone: [tok()], store: [tok("Stolen token"), ["Stolen code", () => C1], ["Result", "Declined", "off"]], network: [tok(), ["Check", "Code reused", "off"]], issuer: [pan(), ["Account", "Active", "okk"]] } },
+      { t: "Type it online", answer: "They type the token into a website as if it were a card number.",
+        detail: "This token is only allowed to pay from your phone, with a fresh code. Typed into a website, it fails the network's check.",
+        flow: "Fraudster → website → network: token, no valid code", active: ["network"], blocked: ["store"], status: ["bad", "Declined: wrong place for this token"],
+        v: { phone: [tok()], store: [tok("Stolen token"), ["Result", "Declined", "off"]], network: [tok(), ["Check", "Phone-only token", "off"]], issuer: [pan(), ["Account", "Active", "okk"]] } },
+      { t: "Compare: plain card", answer: "Without tokens, the café would have stored your real card number instead.",
+        detail: "A stolen real card number can often be used online until your bank spots the fraud and replaces your card. That's what tokens prevent.",
+        status: ["bad", "Real card number exposed"], active: ["store"], blocked: ["store"],
+        v: { phone: [], store: [pan("Stolen card number")], network: [pan("Would receive")], issuer: [pan(), ["Risk", "Card must be replaced", "off"]] } },
+      { t: "Your card is fine", answer: "With the token, nothing happened to your account. Your card keeps working.",
+        detail: "No new card, no updating every subscription. If the bank wants, it can switch off just that token.",
+        status: ["ok", "Card unaffected"], active: ["phone", "issuer"],
+        v: { phone: [tok(), ["Status", "Still working", "okk"]], store: [tok("Stolen token"), ["Value to a thief", "None", "okk"]], network: [tok(), pan("Linked to")], issuer: [pan(), ["Account", "Active", "okk"]] } }
+    ]
+  },
+  lost: {
+    label: "Lose your phone",
+    intro: "Your phone goes missing. Here's why you don't have to cancel your card.",
+    steps: [
+      { t: "Phone lost", answer: "Your phone is gone, and the token is on it.",
+        detail: "A thief would still need your face, fingerprint or passcode to make the phone create a payment code.",
+        status: ["bad", "Phone missing"], active: ["phone"], blocked: ["phone"],
+        v: { phone: [tok(), ["Status", "Lost", "off"]], store: [], network: [tok(), pan("Linked to")], issuer: [pan(), ["Account", "Active", "okk"]] } },
+      { t: "You report it", answer: "You call your bank or erase the phone remotely. Only the token is switched off.",
+        detail: "The bank asks the token service to suspend that one token. Your card number stays exactly as it was.",
+        flow: "Issuer → token service: suspend token 6620", active: ["network", "issuer"], status: ["info", "Token suspended"],
+        v: { phone: [tok(), ["Status", "Lost", "off"]], store: [], network: [tok(), ["Token status", "Suspended", "off"], pan("Linked to")], issuer: [pan(), ["Account", "Active", "okk"], ["Token •••• 6620", "Suspended", "off"]] } },
+      { t: "Thief tries", answer: "If someone does tap with your lost phone, the payment is declined.",
+        detail: "The network sees the token is suspended and stops the payment before it reaches your bank.",
+        flow: "Lost phone → store → network: suspended token", active: ["network"], blocked: ["store"], status: ["bad", "Declined: token suspended"],
+        v: { phone: [tok(), ["Status", "Lost", "off"]], store: [tok("Card number received"), ["Result", "Declined", "off"]], network: [tok(), ["Token status", "Suspended", "off"]], issuer: [pan(), ["Account", "Active", "okk"]] } },
+      { t: "Card still works", answer: "Meanwhile your plastic card, and your saved cards online, keep working.",
+        detail: "Because only the phone's token was switched off, nothing else you pay with needs to change.",
+        status: ["ok", "Card active"], active: ["issuer"],
+        v: { phone: [["Status", "Lost", "off"]], store: [pan("Plastic card tapped"), ["Result", "Approved", "okk"]], network: [["Old token", "Suspended", "off"]], issuer: [pan(), ["Account", "Active", "okk"]] } },
+      { t: "New phone", answer: "On your new phone, you add the same card and get a brand-new token.",
+        detail: "Same card number, new token, tied to the new device. The old token stays dead.",
+        flow: "Token service → new phone: new token", active: ["phone", "network"], status: ["ok", "New token issued"],
+        v: { phone: [["Token", TOKEN2, "token"], ["Works on", "New phone only"]], store: [], network: [["New token", TOKEN2, "token"], ["Old token", "•••• 6620 suspended", "off"], pan("Both linked to")], issuer: [pan(), ["Account", "Active", "okk"]] } }
+    ]
+  }
+};
+
+const order = ["pay", "steal", "lost"];
+let cur = "pay", step = 0;
+const $ = id => document.getElementById(id);
+
+function buildChooser() {
+  const c = $("chooser"); c.innerHTML = "";
+  order.forEach(k => {
+    const b = document.createElement("button");
+    b.type = "button"; b.textContent = S[k].label;
+    b.setAttribute("aria-pressed", k === cur ? "true" : "false");
+    b.addEventListener("click", () => pick(k));
+    c.appendChild(b);
+  });
+}
+function buildRail() {
+  const r = $("rail"), steps = S[cur].steps; r.style.setProperty("--n", steps.length); r.innerHTML = "";
+  steps.forEach((st, i) => {
+    const b = document.createElement("button");
+    b.type = "button"; b.id = "rail-" + i; b.setAttribute("role", "listitem");
+    b.innerHTML = '<span class="dot">' + (i + 1) + '</span><span class="rt"></span>';
+    b.querySelector(".rt").textContent = st.t;
+    b.addEventListener("click", () => { step = i; render(); });
+    r.appendChild(b);
+  });
+}
+function buildParties() {
+  const p = $("parties"); p.innerHTML = "";
+  parties.forEach(pt => {
+    const d = document.createElement("div"); d.className = "party"; d.id = "party-" + pt.id;
+    d.innerHTML = '<div class="who"></div><div class="name"></div><div class="sees">What it can see</div><div class="rows"></div>';
+    d.querySelector(".who").textContent = pt.who; d.querySelector(".name").textContent = pt.name;
+    p.appendChild(d);
+  });
+}
+function pick(k) {
+  cur = k; step = 0; C1 = hex(8); C2 = hex(8);
+  try { history.replaceState(null, "", "#" + k); } catch (e) {}
+  buildChooser(); buildRail(); render();
+}
+const TAGTEXT = { pan: "Real card number", token: "Token", off: "", okk: "" };
+
+function render() {
+  const sc = S[cur], st = sc.steps[step];
+  $("intro").textContent = sc.intro;
+  $("answer").textContent = st.answer;
+  $("detail").textContent = st.detail;
+  $("flow").textContent = st.flow || "";
+  const s = $("status");
+  if (st.status) { s.hidden = false; s.className = "status " + st.status[0]; s.textContent = st.status[1]; } else { s.hidden = true; }
+
+  sc.steps.forEach((_, i) => {
+    const b = $("rail-" + i);
+    b.classList.toggle("current", i === step); b.classList.toggle("done", i < step);
+    b.setAttribute("aria-current", i === step ? "step" : "false");
+  });
+
+  let panSeen = [];
+  parties.forEach(pt => {
+    const el = $("party-" + pt.id), rows = el.querySelector(".rows"), list = st.v[pt.id] || [];
+    el.classList.toggle("active", (st.active || []).includes(pt.id) && !(st.blocked || []).includes(pt.id));
+    el.classList.toggle("blocked", (st.blocked || []).includes(pt.id));
+    rows.innerHTML = "";
+    if (!list.length) { const e = document.createElement("div"); e.className = "empty"; e.textContent = "Nothing about your card"; rows.appendChild(e); }
+    list.forEach(([k, v, tag]) => {
+      const r = document.createElement("div"); r.className = "row";
+      const kk = document.createElement("span"); kk.className = "k"; kk.textContent = k;
+      const vv = document.createElement("span"); vv.className = tag === "off" || tag === "okk" ? "v" : "v";
+      vv.textContent = typeof v === "function" ? v() : v;
+      if (tag === "off") vv.style.color = "var(--bad)";
+      if (tag === "okk") vv.style.color = "var(--good)";
+      r.appendChild(kk); r.appendChild(vv);
+      if (tag === "pan" || tag === "token") {
+        const t = document.createElement("span"); t.className = "tag " + tag; t.textContent = TAGTEXT[tag]; r.appendChild(t);
+      }
+      if (tag === "pan" && !panSeen.includes(pt.name)) panSeen.push(pt.name);
+      rows.appendChild(r);
+    });
+  });
+
+  const tl = $("tally"); tl.innerHTML = "";
+  const a = document.createElement("b"); a.textContent = "Real card number visible to:";
+  const b = document.createElement("span"); b.className = "pan";
+  b.textContent = panSeen.length ? panSeen.join(", ") : "nobody";
+  const c = document.createElement("span"); c.textContent = "(" + panSeen.length + " of 4)";
+  tl.appendChild(a); tl.appendChild(b); tl.appendChild(c);
+
+  $("prev").disabled = step === 0;
+  $("next").disabled = step === sc.steps.length - 1;
+  $("next").textContent = step === sc.steps.length - 1 ? "Done" : "Next step";
+}
+
+$("prev").addEventListener("click", () => { if (step > 0) { step--; render(); } });
+$("next").addEventListener("click", () => { if (step < S[cur].steps.length - 1) { step++; render(); } });
+$("restart").addEventListener("click", () => { step = 0; render(); });
+document.addEventListener("keydown", e => {
+  if (e.key === "ArrowRight") $("next").click();
+  if (e.key === "ArrowLeft") $("prev").click();
+});
+window.addEventListener("hashchange", () => { const h = location.hash.slice(1); if (S[h] && h !== cur) pick(h); });
+
+buildParties();
+const h0 = (location.hash || "").slice(1);
+pick(S[h0] ? h0 : "pay");
+</script>
+</body>
+</html>
