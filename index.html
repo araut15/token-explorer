@@ -106,6 +106,36 @@ footer { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8p
   .party { padding: 12px; }
   .row .v { font-size: 13px; }
 }
+
+/* ---- Phone-friendly layer ---- */
+.rail-wrap { position: relative; scrollbar-width: none; }
+.rail-wrap::-webkit-scrollbar { display: none; }
+.swipe-hint { display: none; }
+@media (max-width: 640px) {
+  .chooser { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin: 0 -16px; padding: 0 16px 2px; }
+  .chooser::-webkit-scrollbar { display: none; }
+  .chooser button { flex: 0 0 auto; min-height: 44px; }
+  .controls {
+    position: sticky; bottom: 0; z-index: 5; margin: 0 -16px; gap: 8px;
+    padding: 10px 16px calc(10px + env(safe-area-inset-bottom, 0px));
+    background: var(--bg); border-top: 1px solid var(--rule); box-shadow: 0 -6px 16px rgba(0,0,0,.06);
+  }
+  .controls .hint { display: none; }
+  .controls button { min-height: 48px; padding: 10px 14px; }
+  .controls #prev, .controls #next { flex: 1; }
+  .swipe-hint { display: block; text-align: center; font-size: 12px; color: var(--muted); margin: -8px 0 0; }
+  h1 { font-size: 28px; }
+  .rail { grid-template-columns: repeat(var(--n, 5), 104px) !important; }
+  .rail button { width: 100%; }
+  .rail .rt { white-space: normal; overflow-wrap: normal; word-break: normal; }
+  .where { scroll-margin-top: 12px; }
+}
+@media (max-width: 480px) {
+  .parties { gap: 8px; }
+  .party { padding: 12px 10px; gap: 8px; }
+  .row .v { font-size: 12px; letter-spacing: -0.02em; }
+  .party .name { font-size: 14px; }
+}
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 </style>
 </head>
@@ -133,6 +163,7 @@ footer { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8p
   <div class="parties" id="parties"></div>
   <div class="tally" id="tally"></div>
 
+<p class="swipe-hint">Swipe left or right to move between steps</p>
   <div class="controls">
     <button type="button" id="prev">Back</button>
     <button type="button" id="next" class="primary">Next step</button>
@@ -357,6 +388,39 @@ window.addEventListener("hashchange", () => { const h = location.hash.slice(1); 
 buildParties();
 const h0 = (location.hash || "").slice(1);
 pick(S[h0] ? h0 : "pay");
+</script>
+
+<script>
+/* ---- Phone-friendly layer: keep the current step in view, and swipe between steps ---- */
+(function () {
+  const wrap = document.querySelector(".rail-wrap"), where = document.querySelector(".where");
+  function centerRail() {
+    const cur = document.querySelector(".rail button.current");
+    if (!wrap || !cur || wrap.scrollWidth <= wrap.clientWidth) return;
+    wrap.scrollTo({ left: cur.offsetLeft - wrap.clientWidth / 2 + cur.offsetWidth / 2, behavior: "smooth" });
+  }
+  function keepInView() {
+    centerRail();
+    if (window.innerWidth > 640 || !where) return;
+    const top = where.getBoundingClientRect().top;
+    if (top < 0 || top > window.innerHeight * 0.35) where.scrollIntoView({ block: "start", behavior: "smooth" });
+  }
+  ["prev", "next", "restart"].forEach(id => { const b = document.getElementById(id); if (b) b.addEventListener("click", () => setTimeout(keepInView, 0)); });
+  document.addEventListener("click", e => { if (e.target.closest && e.target.closest(".rail button, .chooser button")) setTimeout(centerRail, 0); });
+  let x0 = null, y0 = null;
+  document.addEventListener("touchstart", e => {
+    if (e.target.closest && e.target.closest(".rail-wrap, .chooser, .controls, a, input")) { x0 = null; return; }
+    x0 = e.touches[0].clientX; y0 = e.touches[0].clientY;
+  }, { passive: true });
+  document.addEventListener("touchend", e => {
+    if (x0 === null) return;
+    const dx = e.changedTouches[0].clientX - x0, dy = e.changedTouches[0].clientY - y0; x0 = null;
+    if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+    const b = document.getElementById(dx < 0 ? "next" : "prev");
+    if (b && !b.disabled) b.click();
+  }, { passive: true });
+  setTimeout(centerRail, 0);
+})();
 </script>
 </body>
 </html>
